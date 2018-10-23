@@ -14,7 +14,7 @@ from multiprocessing import Pool
 client =pymongo.MongoClient(MONGO_URL,connect=False)
 db=client[MONGO_DB]
 
-def get_page_index(headers, offset, keyword):
+def get_page_index(offset, keyword):
     data = {
         'offset': offset,
         'format': 'json',
@@ -25,8 +25,9 @@ def get_page_index(headers, offset, keyword):
         'from': 'search_tab'
     }
     url = 'https://www.toutiao.com/search_content/?' + urlencode(data)
+    headers={"User-Agent":'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'}
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url,headers=headers)
         if response.status_code == 200:
             return response.text
         return None
@@ -41,9 +42,10 @@ def parse_page_index(html):
         for item in data.get('data'):
             yield item.get('article_url')
 
-def get_page_detail(url,headers):
+def get_page_detail(url):
   try:
-    response=requests.get(url,headers)
+    headers={"User-Agent":'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'}
+    response=requests.get(url,headers=headers)
     if response.status_code ==200:
       return response.text
     return None
@@ -54,7 +56,6 @@ def get_page_detail(url,headers):
 def parse_page_detail(html,url):
   soup=BeautifulSoup(html,'lxml')
   title=soup.select('title')[0].get_text()
-  
   pattern=re.compile('gallery: JSON.parse\("(.*?)"\),',re.S)
   result=re.search(pattern,html)
   if result:
@@ -80,43 +81,37 @@ def save_to_mongo(result):
 def download_image(url):
   print('download image...',url)
   try:
-    response=requests.get(url)
+    headers={"User-Agent":'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'}
+    response=requests.get(url,headers=headers)
     if response.status_code ==200:
-      save_iamge(response.content) 
+      save_image(response.content) 
     return None
   except RequestException:
     print('{0} requests image error... '.format(url))
     return None
     
-def save_iamge(content):
-  file_path='{0}/{1}.{2}'.format(os.getcwd(), md5(content).hexdigest(),'jpg')
+def save_image(content):
+  dir_path='{0}/{1}'.format(os.getcwd(), 'images')
+  if not os.path.exists(dir_path):
+    os.mkdir(dir_path)
+  #print(dir_path)
+  file_path='{0}/{1}.{2}'.format(dir_path,md5(content).hexdigest(),'jpg')
   if not os.path.exists(file_path):
     with open(file_path,'wb') as f:
       f.write(content)
       
 def main(offset):
-    my_headers = ["Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36",
-                  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.153 Safari/537.36",
-                  "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:30.0) Gecko/20100101 Firefox/30.0",
-                  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.75.14 (KHTML, like Gecko) Version/7.0.3 Safari/537.75.14",
-                  "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Win64; x64; Trident/6.0)"
-                  ]
-    random_header = random.choice(my_headers)
-    headers = {"User-Agent": random_header}
-    html = get_page_index(headers, offset, KEYWORD)
+    html = get_page_index(offset, KEYWORD)
     # print(html)
     for url in parse_page_index(html):
       if url:
-        html=get_page_detail(url, headers)
+        html=get_page_detail(url)
         if html:
           result=parse_page_detail(html,url)
           if result:
-            save_to_mongo(result)
-        
-
+            save_to_mongo(result)   
 
 if __name__ == "__main__":
-    #main()
     groups=[x*20 for x in range(GROUP_START,GROUP_END)]
     pool =Pool()
     pool.map(main,groups)
