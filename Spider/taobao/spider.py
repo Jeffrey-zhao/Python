@@ -11,14 +11,15 @@ from config import *
 
 client=pymongo.MongoClient(MONGO_URL)
 db=client[MONGO_DB]
-browser=webdriver.PhantomJS(service_args=SERVICE_ARGS)
-#browser=webdriver.Chrome()
+#browser=webdriver.PhantomJS(service_args=SERVICE_ARGS)
+browser=webdriver.Chrome()
 wait=element=WebDriverWait(browser,10)
 browser.set_window_size(1400,900)
 
 def search():
     print('searching...')
     try:
+        headers={"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36"}
         browser.get('https://www.taobao.com')
         input=wait.until(EC.presence_of_element_located((By.CSS_SELECTOR,'#q')))
         submit=wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,'#J_TSearchForm > div.search-button > button')))
